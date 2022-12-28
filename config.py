@@ -1,0 +1,13 @@
+import pyaudio
+
+FORMAT = pyaudio.paFloat32
+CHANNELS = 1
+RATE = 16000
+
+NUM_FILTERS = 40
+HOP_LENGTH = 160
+N_FFT = 400
+
+DEVICE_INDEX = 0
+
+INPUT_THRESHOLD = 0.05
