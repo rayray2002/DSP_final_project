@@ -7,8 +7,9 @@ from dtw import DTWDetector
 
 filename = sys.argv[1]
 signal, sr = librosa.load(filename, sr=RATE)
-signal = signal / np.max(np.abs(signal))
-mfcc = librosa.feature.mfcc(y=signal, sr=RATE, n_mfcc=40, hop_length=160, n_fft=400).T
+# signal = signal / np.max(np.abs(signal))
+signal = librosa.util.normalize(signal)
+mfcc = get_mfcc(signal)
 
 detector = DTWDetector()
 pred, (dist, D, start, end) = detector.detect_keyword(mfcc)

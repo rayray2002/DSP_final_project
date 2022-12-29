@@ -1,0 +1,6 @@
+venv/
+keyword_copy/
+__pycache__/
+
+*.docx
+*.wav

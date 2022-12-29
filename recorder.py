@@ -73,7 +73,8 @@ while True:
 
     print("duration:", duration)
     
-    data = data / np.max(np.abs(data))
+    # data = data / np.max(np.abs(data))
+    data = librosa.util.normalize(data)
     
     count += 1
     sf.write(f"{FOLDER}/{prefix}-{count}.wav", data, RATE)

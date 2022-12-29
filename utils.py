@@ -1,10 +1,12 @@
 import numpy as np
 import time
+import librosa
 
 from config import *
 
 
 def get_input_device_index():
+    global DEVICE_INDEX
     for i in range(pyaudio.PyAudio().get_device_count()):
         if pyaudio.PyAudio().get_device_info_by_index(i)["maxInputChannels"] > 0:
             if (
@@ -13,6 +15,18 @@ def get_input_device_index():
             ):
                 DEVICE_INDEX = i
     print(pyaudio.PyAudio().get_device_info_by_index(DEVICE_INDEX)["name"])
+    return DEVICE_INDEX
+
+
+def get_mfcc(data):
+    mfcc = librosa.feature.mfcc(
+        y=data, sr=RATE, n_mfcc=NUM_FILTERS, hop_length=HOP_LENGTH, n_fft=N_FFT
+    )
+    # first and second order derivatives
+    mfcc_delta = librosa.feature.delta(mfcc)
+    mfcc_delta2 = librosa.feature.delta(mfcc, order=2)
+    mfcc = np.concatenate((mfcc, mfcc_delta, mfcc_delta2), axis=0)
+    return mfcc.T
 
 
 def get_threshold(stream, CHUNK, dtype=FORMAT):
@@ -66,9 +80,17 @@ def truncate_silence(data, threshold=100):
     return data, duration
 
 
+def bold(text):
+    return f"\033[1m{text}\033[0m"
+
+
 def green(text):
     return f"\033[32m{text}\033[0m"
 
 
 def red(text):
     return f"\033[31m{text}\033[0m"
+
+
+def blue(text):
+    return f"\033[34m{text}\033[0m"

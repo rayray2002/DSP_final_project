@@ -18,7 +18,7 @@ class StreamPrediction:
         self.chunk_samples = int(self.sr * self.chunk_duration)
         self.window_duration = 1
         self.window_samples = int(self.sr * self.window_duration)
-        self.silence_threshold = 0.001
+        self.silence_threshold = 0.002
 
         # Data structures and buffers
         self.queue = Queue()
@@ -31,7 +31,8 @@ class StreamPrediction:
         self.max_amp = 0.1
 
         # detector
-        self.detector = detector()
+        self.starburst_detector = detector("starburst")
+        self.star_detector = detector("star")
 
     def start_stream(self):
         """
@@ -64,27 +65,54 @@ class StreamPrediction:
                 if rms > self.silence_threshold:
                     # normalize
                     data_norm = librosa.util.normalize(data)
-                    fbank = librosa.feature.mfcc(
-                        y=data_norm,
-                        sr=self.sr,
-                        n_mfcc=NUM_FILTERS,
-                        hop_length=HOP_LENGTH,
-                        n_fft=N_FFT,
-                    ).T
-                    # print(fbank.shape)
-                    pred, (dist, _, start, end) = self.detector.detect_keyword(fbank)
-                else:
-                    pred, (dist, _, start, end) = False, (0, 0, 0, 0)
-                # print(pred, dist, start, end)
-
-                self.plotter(data, pred, dist)
-
-                text = f"dist: {dist:7.1f}, start: {start:3d}, end: {end:3d}"
-                if pred:
-                    print(green(text))
-                else:
-                    print(red(text))
+                    mfcc = get_mfcc(data_norm)  # print(fbank.shape)
+                    starburst_pred, (starburst_dist, _, starburst_start, starburst_end) = self.starburst_detector.detect_keyword(mfcc)
+                    star_pred, (star_dist, _, star_start, star_end) = self.star_detector.detect_keyword(mfcc)
                     
+                else:
+                    starburst_pred, (starburst_dist, _, starburst_start, starburst_end) = False, (0, 0, 0, 0)
+                    star_pred, (star_dist, _, star_start, star_end) = False, (0, 0, 0, 0)
+                # print(starburst_pred, dist, starburst_start, starburst_end)
+                
+                pred = starburst_pred
+                if star_pred and star_dist < starburst_dist:
+                    pred = False
+                    
+                self.plotter(data, pred, starburst_dist)
+                
+                if starburst_dist > 0:
+                    if starburst_dist < self.starburst_detector.dist_threshold:
+                        dist_text = green(f"dist: {starburst_dist:7.1f}")
+                    else:
+                        dist_text = red(f"dist: {starburst_dist:7.1f}")
+
+                    length = starburst_end - starburst_start
+                    if length > self.starburst_detector.length_threshold:
+                        length_text = green(f"length: {length:2d}")
+                    else:
+                        length_text = red(f"length: {length:2d}")
+
+                    q_size = self.queue.qsize()
+                    if q_size > 0:
+                        Q_text = red(f"Q: {q_size:2d}")
+                    else:
+                        Q_text = green(f"Q: {q_size:2d}")
+
+                    text = f"{dist_text}, {length_text}, {Q_text}, "
+                    
+                    star_text = f"star: dist: {star_dist:7.1f}, length: {(star_end - star_start):2d}"
+                    if star_pred:
+                        text += green(star_text)
+                    else:
+                        text += red(star_text)
+
+                    if pred:
+                        text += bold(blue("  Keyword detected!"))
+                        
+                    print(text)
+                else:
+                    print(".")
+
         except (KeyboardInterrupt, SystemExit):
             stream.stop_stream()
             stream.close()
@@ -103,10 +131,10 @@ class StreamPrediction:
         rms = np.sqrt(np.mean(np.square(data0)))
         # print(rms)
 
-        if rms < self.silence_threshold:
-            print(".", sep="", end="", flush=True)
-        else:
-            print("-", sep="", end="", flush=True)
+        # if rms < self.silence_threshold:
+        #     print(".", sep="", end="", flush=True)
+        # else:
+        #     print("-", sep="", end="", flush=True)
 
         self.data = np.append(self.data, data0)
 
@@ -145,13 +173,13 @@ class StreamPrediction:
         plt.ylabel("Amplitude")
 
         # print(fbank.shape)
-        # Filterbank energies
+        # MFCC
         # plt.subplot(312)
-        # plt.imshow(fbank[-fbank.shape[0] :, :].T, aspect="auto")
+        # plt.imshow(mfcc[-mfcc.shape[0] :, :].T, aspect="auto")
         # plt.gca().xaxis.set_major_locator(plt.NullLocator())
         # plt.gca().invert_yaxis()
-        # plt.ylim(0, NUM_FILTERS)
-        # plt.ylabel("$\log \, E_{m}$")
+        # plt.ylim(0, NUM_FILTERS * 3)
+        # plt.ylabel("MFCC")
 
         # keyword detection
         plt.subplot(212)

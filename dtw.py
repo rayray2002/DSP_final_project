@@ -12,29 +12,22 @@ np.set_printoptions(threshold=sys.maxsize, linewidth=np.inf)
 
 
 class DTWDetector:
-    def __init__(self):
+    def __init__(self, folder="keyword"):
         self.keyword_MFCCs = []
-        self.dist_threshold = 500
+        self.dist_threshold = 400
         self.length_threshold = 30
 
-        for filename in os.listdir("keyword"):
+        for filename in os.listdir(folder):
             if filename.endswith(".wav"):
-                filepath = os.path.join("keyword", filename)
-                MFCC = self.get_MFCC(filepath)
-                self.keyword_MFCCs.append(MFCC)
+                filepath = os.path.join(folder, filename)
+
+                signal = librosa.load(filepath, sr=RATE)[0]
+                signal = librosa.util.normalize(signal)
+                mfcc = get_mfcc(signal)
+                self.keyword_MFCCs.append(mfcc)
                 # print(MFCC.shape)
 
         # self.calibrate()
-
-    def get_MFCC(self, filepath):
-        """
-        get MFCC features from audio file
-        """
-        signal, sr = librosa.load(filepath, sr=RATE)
-        signal = librosa.util.normalize(signal)
-        return librosa.feature.mfcc(
-            y=signal, sr=RATE, n_mfcc=NUM_FILTERS, hop_length=HOP_LENGTH, n_fft=N_FFT
-        ).T
 
     def dtw(self, x, y, dist):
         """
@@ -136,7 +129,7 @@ class DTWDetector:
             # print(i, mfcc1.shape)
             for j, mfcc2 in enumerate(self.keyword_MFCCs):
                 dist, D, start, end = self.dtw(
-                    mfcc1, mfcc2, dist=lambda x, y: np.linalg.norm(x - y, ord=1)
+                    mfcc1, mfcc2, dist=lambda x, y: np.linalg.norm(x - y, ord=2)
                 )
                 dists.append(dist)
 
@@ -187,12 +180,10 @@ if __name__ == "__main__":
         #     print("No audio input")
         #     continue
 
-        fbank = librosa.feature.mfcc(
-            y=data, sr=RATE, n_mfcc=NUM_FILTERS, hop_length=HOP_LENGTH, n_fft=N_FFT
-        ).T
-        pred, (dist, D, start, end) = detector.detect_keyword(fbank)
+        mfcc = get_mfcc(data)
+        pred, (dist, D, start, end) = detector.detect_keyword(mfcc)
 
-        print(data.shape, fbank.shape)
+        print(data.shape, mfcc.shape)
         # print(np.array2string(D, precision=0, separator=" "))
 
         if pred:
